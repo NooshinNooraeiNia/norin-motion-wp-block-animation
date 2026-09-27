@@ -1,0 +1,9 @@
+.has-gmotion.is-kinetivo-animating {
+	will-change: transform, opacity, filter, clip-path;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.has-gmotion.is-kinetivo-animating {
+		will-change: opacity;
+	}
+}
