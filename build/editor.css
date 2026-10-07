@@ -1,14 +1,14 @@
-.kinetivo-free-actions {
+.norinmotion-actions {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: 8px;
 }
 
-.kinetivo-free-actions--single {
+.norinmotion-actions--single {
 	grid-template-columns: minmax(0, 1fr);
 }
 
-.kinetivo-free-actions > .components-button {
+.norinmotion-actions > .components-button {
 	box-sizing: border-box;
 	justify-content: center;
 	width: 100%;
@@ -23,7 +23,7 @@
 	white-space: normal;
 }
 
-.kinetivo-free-actions-feedback {
+.norinmotion-actions-feedback {
 	margin: 12px 0 0;
 	color: #50575e;
 	font-size: 12px;

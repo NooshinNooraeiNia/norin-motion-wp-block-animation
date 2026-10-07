@@ -2,19 +2,22 @@
 /**
  * Plugin coordinator.
  *
- * @package GutenbergMotion
+ * @package NorinMotion
  */
 
 declare(strict_types=1);
 
-namespace GutenbergMotion;
+namespace NorinMotion;
 
-use GutenbergMotion\Blocks\AttributeRegistrar;
-use GutenbergMotion\Blocks\CompatibilityRegistry;
-use GutenbergMotion\Blocks\RenderAnnotator;
-use GutenbergMotion\Capabilities\Registry;
-use GutenbergMotion\Config\Sanitizer;
-use GutenbergMotion\Settings\SettingsPage;
+use NorinMotion\Blocks\AttributeRegistrar;
+use NorinMotion\Blocks\CompatibilityRegistry;
+use NorinMotion\Blocks\RenderAnnotator;
+use NorinMotion\Config\Sanitizer;
+use NorinMotion\Settings\SettingsPage;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 final class Plugin {
 	private static ?self $instance = null;
@@ -24,9 +27,9 @@ final class Plugin {
 	}
 
 	public static function activate(): void {
-		if ( false === get_option( 'gmotion_settings', false ) ) {
+		if ( false === get_option( 'norinmotion_settings', false ) ) {
 			add_option(
-				'gmotion_settings',
+				'norinmotion_settings',
 				array(
 					'enabled'        => true,
 					'reduced_motion' => 'inherit',
@@ -46,17 +49,9 @@ final class Plugin {
 		$registry  = new CompatibilityRegistry();
 		$sanitizer = new Sanitizer();
 		$assets    = new Assets();
-		$capabilities = new Registry();
 
 		( new AttributeRegistrar( $registry ) )->register();
-		( new RenderAnnotator( $registry, $sanitizer, $assets, $capabilities ) )->register();
-		add_action(
-			'enqueue_block_editor_assets',
-			static function () use ( $capabilities ): void {
-				wp_add_inline_script( Assets::EDITOR_HANDLE, 'window.KinetivoCapabilities=' . wp_json_encode( $capabilities->public_manifest() ) . ';', 'before' );
-			},
-			20
-		);
+		( new RenderAnnotator( $registry, $sanitizer, $assets ) )->register();
 		( new SettingsPage() )->register();
 		$assets->register();
 

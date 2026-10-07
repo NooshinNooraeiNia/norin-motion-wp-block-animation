@@ -4,7 +4,7 @@ Tags: animation, gutenberg, blocks, scroll animation, accessibility
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -34,7 +34,7 @@ Animate headings, paragraphs, images, groups, columns, galleries, lists, covers,
 
 * Preview before publishing: see the selected effect inside the block editor.
 * Choose when it starts: play on page load or when a block enters the viewport.
-* Set the pace: adjust duration, delay and familiar CSS easing options, including ease-in, ease-out and ease-in-out.
+* Set the pace: adjust duration, delay, repeat count and direction, with nine easing curves including ease-in, ease-out and ease-in-out.
 * Refine each effect: adjust distance, scale, rotation or blur where supported.
 * Adapt for smaller screens: control animation visibility, distance and duration for tablet and mobile.
 * Reuse your work: Copy settings and Paste settings transfer motion between blocks.
@@ -43,10 +43,6 @@ Animate headings, paragraphs, images, groups, columns, galleries, lists, covers,
 = Considerate by design =
 
 Norin Motion - Block Animation respects reduced-motion preferences, with options to disable animation or simplify it to a short fade. It keeps your existing block structure and readable page content, and loads its frontend animation assets only where motion is configured. No external animation service or CDN is required.
-
-= Take motion further with WP Motion Block Pro =
-
-The optional Pro add-on expands the collection to 56 effects in total and supports up to 5 animations per block. Explore animated text, media effects, staggered groups, hover interactions and scroll-driven motion. Your existing animation settings carry over when you upgrade.
 
 == Installation ==
 
@@ -58,7 +54,7 @@ The optional Pro add-on expands the collection to 56 effects in total and suppor
 
 = Is Norin Motion - Block Animation free to use? =
 
-Yes. All 20 included effects and the plugin's preview, timing, responsive and copy/paste controls work without a paid license or an account. Advanced features are available separately in WP Motion Block Pro.
+Yes. All 20 included effects and the plugin's preview, timing, responsive and copy/paste controls work without a paid license or an account.
 
 = Which blocks can I animate? =
 
@@ -90,7 +86,7 @@ No. This plugin includes no analytics, telemetry, license checks or external ser
 
 = Can I add several animations to one block? =
 
-This version provides one animation per block. The optional WP Motion Block Pro add-on supports up to five, with separate triggers and ordering controls.
+Each block has one configurable animation. To animate several elements, configure motion on each supported block.
 
 == Source Code and Build Instructions ==
 
@@ -105,11 +101,16 @@ Despite the directory name, these files are the original source files maintained
 
 No compilation, transpilation, bundling, or minification step is required. To modify the plugin's JavaScript or CSS, edit these files directly. WordPress loads them as shipped. A release ZIP packages the files without transforming their contents.
 
-The free plugin does not bundle third-party JavaScript libraries. Editor dependencies are provided by WordPress through registered script dependencies.
+The plugin does not bundle third-party JavaScript libraries. Editor dependencies are provided by WordPress through registered script dependencies.
 
 Project repository: https://github.com/NooshinNooraeiNia/norin-motion-wp-block-animation
 
 == Changelog ==
+
+= 1.1.1 =
+* Added Repeat count, Alternate direction and four additional easing curves to the Timing panel.
+* Simplified the saved animation settings and removed unused code.
+* Every feature in the plugin is available to all users, with no account or license.
 
 = 1.1.0 =
 * Introduced Norin Motion - Block Animation branding and the directory-ready package.

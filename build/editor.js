@@ -2,7 +2,8 @@
 	'use strict';
 	var el = wp.element.createElement,
 		Fragment = wp.element.Fragment,
-		__ = wp.i18n.__;
+		__ = wp.i18n.__,
+		sprintf = wp.i18n.sprintf;
 	var supported = [
 		'core/heading',
 		'core/paragraph',
@@ -17,7 +18,7 @@
 		'core/quote',
 		'core/media-text'
 	];
-	var freeEffects = [
+	var effects = [
 		['fade-in', __('Fade In', 'norinmotion')],
 		['fade-up', __('Fade Up', 'norinmotion')],
 		['fade-down', __('Fade Down', 'norinmotion')],
@@ -39,7 +40,7 @@
 		['flip-y', __('Flip Y', 'norinmotion')],
 		['reveal-top', __('Reveal From Top', 'norinmotion')]
 	];
-	var freeSlugs = freeEffects.map(function (item) {
+	var effectSlugs = effects.map(function (item) {
 			return item[0];
 		}),
 		previews = new WeakMap();
@@ -49,7 +50,6 @@
 			enabled: true,
 			effect: {
 				preset: 'fade-up',
-				target: { mode: 'root', selector: '' },
 				from: { opacity: 0, x: 0, y: 32, scale: 1, rotation: 0, blur: 0 },
 				to: { opacity: 1, x: 0, y: 0, scale: 1, rotation: 0, blur: 0 }
 			},
@@ -58,22 +58,15 @@
 				delay: 0,
 				easing: 'ease-out',
 				iterations: 1,
-				direction: 'normal',
-				stagger: null
+				direction: 'normal'
 			},
 			trigger: {
 				type: 'viewport',
 				once: true,
-				start: 'top 85%',
-				end: 'bottom 20%',
-				mode: 'enter',
-				smoothing: 0,
-				pin: { enabled: false, spacing: true }
+				start: 'top 85%'
 			},
 			responsive: { tablet: {}, mobile: {} },
-			a11y: { reducedMotion: 'disable', fallback: 'final-state' },
-			requirements: [],
-			meta: { sourcePreset: 'fade-up', migratedFrom: 2 }
+			a11y: { reducedMotion: 'disable' }
 		};
 	}
 	function clone(value) {
@@ -83,7 +76,7 @@
 		var out = clone(base);
 		if (!value || typeof value !== 'object' || Array.isArray(value)) return out;
 		Object.keys(value).forEach(function (key) {
-			if (['__proto__', 'prototype', 'constructor'].indexOf(key) !== -1) return;
+			if (!Object.prototype.hasOwnProperty.call(base, key)) return;
 			if (base[key] && typeof base[key] === 'object' && !Array.isArray(base[key]))
 				out[key] = withDefaults(base[key], value[key]);
 			else if (value[key] !== null && (base[key] == null || typeof value[key] === typeof base[key]))
@@ -91,66 +84,37 @@
 		});
 		return out;
 	}
-	function easeToken(value) {
-		return (
-			{
-				none: 'linear',
-				'power1.out': 'gentle',
-				'sine.out': 'gentle',
-				'power3.out': 'emphasized',
-				'power4.out': 'emphasized',
-				'expo.out': 'emphasized',
-				'circ.out': 'emphasized',
-				'back.out': 'expressive',
-				'bounce.out': 'expressive',
-				'elastic.out': 'expressive'
-			}[value] || 'standard'
-		);
+	function responsiveOverride(value) {
+		var result = {};
+		if (!value || typeof value !== 'object' || Array.isArray(value)) return result;
+		if (Object.prototype.hasOwnProperty.call(value, 'enabled')) result.enabled = value.enabled !== false;
+		var from = value.effect && value.effect.from, state = {};
+		Object.keys(defaults().effect.from).forEach(function (key) {
+			if (from && typeof from[key] === 'number' && Number.isFinite(from[key])) state[key] = from[key];
+		});
+		if (Object.keys(state).length) result.effect = { from: state };
+		var timing = {};
+		['duration', 'delay'].forEach(function (key) {
+			if (value.timing && typeof value.timing[key] === 'number' && Number.isFinite(value.timing[key])) timing[key] = value.timing[key];
+		});
+		if (value.timing && ['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out', 'gentle', 'standard', 'emphasized', 'expressive'].indexOf(value.timing.easing) !== -1) timing.easing = value.timing.easing;
+		if (Object.keys(timing).length) result.timing = timing;
+		return result;
 	}
+
 	function normalize(raw) {
 		if (!raw || typeof raw !== 'object') return null;
-		if (raw.v === 2)
-			return withDefaults(applyEffect(null, (raw.effect && raw.effect.preset) || 'fade-up'), raw);
-		if (raw.v === 1) {
-			var next = defaults(),
-				effect = raw.effect || {},
-				from = effect.from || {},
-				timing = raw.timing || {},
-				trigger = raw.trigger || {},
-				scroll = trigger.scroll || {};
-			next.enabled = raw.enabled === true;
-			next.effect.preset = effect.preset || 'fade-up';
-			next.effect.target = effect.target || next.effect.target;
-			next.effect.from.y = typeof from.y === 'number' ? from.y : 32;
-			next.effect.from.scale = typeof from.scale === 'number' ? from.scale : 1;
-			next.effect.from.rotation = typeof from.rotation === 'number' ? from.rotation : 0;
-			next.effect.from.blur = typeof from.blur === 'number' ? from.blur : 0;
-			next.timing.duration = timing.duration || 0.7;
-			next.timing.delay = timing.delay || 0;
-			next.timing.easing = easeToken(timing.ease);
-			next.timing.iterations = 1 + Math.max(0, timing.repeat || 0);
-			next.timing.direction = timing.yoyo ? 'alternate' : 'normal';
-			next.trigger.type = trigger.type || 'viewport';
-			next.trigger.once = trigger.once !== false;
-			next.trigger.start = scroll.start || 'top 85%';
-			next.trigger.end = scroll.end || 'bottom 20%';
-			next.trigger.mode =
-				scroll.scrub !== undefined && scroll.scrub !== false ? 'progress' : 'enter';
-			next.responsive = raw.responsive || next.responsive;
-			next.a11y = raw.a11y || next.a11y;
-			next.meta = { sourcePreset: next.effect.preset, migratedFrom: 1 };
-			return next;
-		}
-		if (!Object.prototype.hasOwnProperty.call(raw, 'v')) {
-			var migrated = defaults();
-			migrated.enabled = raw.enabled === true;
-			migrated.effect.from.y = typeof raw.distance === 'number' ? raw.distance : 32;
-			migrated.timing.duration = (raw.timing && raw.timing.duration) || 0.7;
-			migrated.timing.delay = (raw.timing && raw.timing.delay) || 0;
-			migrated.timing.easing = easeToken(raw.timing && raw.timing.ease);
-			migrated.trigger.start = raw.start || 'top 85%';
-			migrated.meta.migratedFrom = 0;
-			return migrated;
+		if (raw.v === 2) {
+			var normalized = withDefaults(applyEffect(null, (raw.effect && raw.effect.preset) || 'fade-up'), raw);
+			if (effectSlugs.indexOf(normalized.effect.preset) === -1) normalized.effect.preset = 'fade-up';
+			['tablet', 'mobile'].forEach(function (device) {
+				normalized.responsive[device] = responsiveOverride(raw.responsive && raw.responsive[device]);
+			});
+			normalized.enabled = raw.enabled === true;
+			if (['viewport', 'load'].indexOf(normalized.trigger.type) === -1) normalized.trigger.type = 'viewport';
+			normalized.timing.iterations = Math.max(1, Math.min(21, Math.round(normalized.timing.iterations) || 1));
+			if (normalized.timing.direction !== 'alternate') normalized.timing.direction = 'normal';
+			return normalized;
 		}
 		return null;
 	}
@@ -166,9 +130,8 @@
 	}
 	function applyEffect(config, preset) {
 		var next = defaults();
-		if (config && config.animations) next.animations = clone(config.animations);
+		preset = effectSlugs.indexOf(preset) === -1 ? 'fade-up' : preset;
 		next.effect.preset = preset;
-		next.effect.target = { mode: 'root', selector: '' };
 		next.effect.from = defaults().effect.from;
 		next.effect.from.y = 0;
 		next.effect.to = defaults().effect.to;
@@ -182,8 +145,6 @@
 		if (preset === 'rotate-in-left') next.effect.from.rotation = -12;
 		if (preset === 'rotate-in-right') next.effect.from.rotation = 12;
 		if (preset === 'blur-in') next.effect.from.blur = 12;
-		next.meta.sourcePreset = preset;
-		next.requirements = [];
 		return next;
 	}
 	function findBlock(id) {
@@ -284,7 +245,7 @@
 			});
 	}
 	function effectOptions() {
-		return freeEffects.map(function (item) {
+		return effects.map(function (item) {
 			return { value: item[0], label: item[1] };
 		});
 	}
@@ -299,7 +260,8 @@
 		var controls = [
 			el(wp.components.ToggleControl, {
 				key: device + '-enabled',
-				label: __('Enable on ', 'norinmotion') + label,
+				/* translators: %s: device name, e.g. Tablet. */
+				label: sprintf(__('Enable on %s', 'norinmotion'), label),
 				checked: override.enabled !== false,
 				onChange: function (value) {
 					set(['responsive', device, 'enabled'], value);
@@ -310,7 +272,8 @@
 			controls.push(
 				el(wp.components.RangeControl, {
 					key: device + '-distance',
-					label: label + ' ' + __('distance (px)', 'norinmotion'),
+					/* translators: %s: device name, e.g. Tablet. */
+					label: sprintf(__('%s distance (px)', 'norinmotion'), label),
 					value: typeof from[axis] === 'number' ? Math.abs(from[axis]) : baseDistance,
 					min: 0,
 					max: 300,
@@ -322,7 +285,8 @@
 		controls.push(
 			el(wp.components.RangeControl, {
 				key: device + '-duration',
-				label: label + ' ' + __('duration (seconds)', 'norinmotion'),
+				/* translators: %s: device name, e.g. Tablet. */
+				label: sprintf(__('%s duration (seconds)', 'norinmotion'), label),
 				value: typeof timing.duration === 'number' ? timing.duration : config.timing.duration,
 				min: 0.1,
 				max: 10,
@@ -335,19 +299,18 @@
 		return controls;
 	}
 
-	function easingOptions(current) {
-		var values = ['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out'];
-		var labels = {
-			gentle: 'cubic-bezier(.39,.575,.565,1)',
-			standard: 'cubic-bezier(.16,1,.3,1)',
-			emphasized: 'cubic-bezier(.19,1,.22,1)',
-			expressive: 'cubic-bezier(.34,1.56,.64,1)'
-		};
-		var result = values.map(function (value) {
-			return { label: value, value: value };
-		});
-		if (labels[current]) result.push({ label: labels[current] + ' (saved)', value: current });
-		return result;
+	function easingOptions() {
+		return [
+			{ label: __('Linear', 'norinmotion'), value: 'linear' },
+			{ label: __('Ease', 'norinmotion'), value: 'ease' },
+			{ label: __('Ease in', 'norinmotion'), value: 'ease-in' },
+			{ label: __('Ease out', 'norinmotion'), value: 'ease-out' },
+			{ label: __('Ease in-out', 'norinmotion'), value: 'ease-in-out' },
+			{ label: __('Gentle', 'norinmotion'), value: 'gentle' },
+			{ label: __('Standard', 'norinmotion'), value: 'standard' },
+			{ label: __('Emphasized', 'norinmotion'), value: 'emphasized' },
+			{ label: __('Expressive (overshoot)', 'norinmotion'), value: 'expressive' }
+		];
 	}
 	var copiedSettings = null;
 	function copySettings(config) {
@@ -355,14 +318,14 @@
 		return navigator.clipboard && navigator.clipboard.writeText
 			? navigator.clipboard.writeText(JSON.stringify(config)).then(
 					function () {
-						return 'Settings copied. Select another block and use Paste settings.';
+						return __('Settings copied. Select another block and use Paste settings.', 'norinmotion');
 					},
 					function () {
-						return 'Settings copied within this editor. Select another block and use Paste settings.';
+						return __('Settings copied within this editor. Select another block and use Paste settings.', 'norinmotion');
 					}
 				)
 			: Promise.resolve(
-					'Settings copied within this editor. Select another block and use Paste settings.'
+					__('Settings copied within this editor. Select another block and use Paste settings.', 'norinmotion')
 				);
 	}
 	function pasteSettings() {
@@ -371,12 +334,12 @@
 				? Promise.resolve(JSON.stringify(copiedSettings))
 				: navigator.clipboard && navigator.clipboard.readText
 					? navigator.clipboard.readText()
-					: Promise.reject(new Error('Copy motion settings from a block first.'))
+					: Promise.reject(new Error(__('Copy motion settings from a block first.', 'norinmotion')))
 		).then(function (text) {
-			if (text.length > 24576) throw new Error('These motion settings are too large.');
+			if (text.length > 24576) throw new Error(__('These motion settings are too large.', 'norinmotion'));
 			var value = JSON.parse(text, function (key, item) {
 				if (['__proto__', 'prototype', 'constructor'].indexOf(key) !== -1)
-					throw new Error('Invalid motion settings.');
+					throw new Error(__('Invalid motion settings.', 'norinmotion'));
 				return item;
 			});
 			if (
@@ -386,28 +349,24 @@
 				!value.effect ||
 				typeof value.effect.preset !== 'string'
 			)
-				throw new Error('The clipboard does not contain valid motion settings.');
+				throw new Error(__('The clipboard does not contain valid motion settings.', 'norinmotion'));
 			return normalize(value);
 		});
 	}
-	window.KinetivoEditor = {
+	window.NorinMotionEditor = {
 		defaults: function (preset) {
 			return applyEffect(null, preset || 'fade-up');
 		},
 		normalize: normalize,
-		keyframes: keyframes,
 		options: effectOptions,
-		easingOptions: easingOptions,
 		copy: copySettings,
-		paste: pasteSettings,
-		deviceControls: deviceControls,
-		supported: supported
+		paste: pasteSettings
 	};
 
-	wp.hooks.addFilter('blocks.registerBlockType', 'kinetivo/attribute', function (settings, name) {
+	wp.hooks.addFilter('blocks.registerBlockType', 'norinmotion/attribute', function (settings, name) {
 		if (supported.indexOf(name) === -1) return settings;
 		return Object.assign({}, settings, {
-			attributes: Object.assign({}, settings.attributes, { gmotion: { type: 'object' } })
+			attributes: Object.assign({}, settings.attributes, { norinmotion: { type: 'object' } })
 		});
 	});
 	var withMotion = wp.compose.createHigherOrderComponent(function (BlockEdit) {
@@ -415,14 +374,13 @@
 			var feedback = wp.element.useState(''),
 				message = feedback[0],
 				setMessage = feedback[1];
-			if (!props.isSelected || supported.indexOf(props.name) === -1 || window.KinetivoProActive)
+			if (!props.isSelected || supported.indexOf(props.name) === -1)
 				return el(BlockEdit, props);
-			var raw = props.attributes.gmotion,
+			var raw = props.attributes.norinmotion,
 				config = normalize(raw),
-				enabled = !!(config && config.enabled),
-				available = !config || freeSlugs.indexOf(config.effect.preset) !== -1;
+				enabled = !!(config && config.enabled);
 			function commit(next) {
-				props.setAttributes({ gmotion: next });
+				props.setAttributes({ norinmotion: next });
 			}
 			function set(path, value) {
 				commit(update(config, path, value));
@@ -445,7 +403,6 @@
 						{
 							key: 'preview',
 							variant: 'primary',
-							disabled: !available,
 							onClick: function () {
 								preview(props.clientId, config);
 							}
@@ -474,7 +431,7 @@
 							pasteSettings()
 								.then(function (next) {
 									commit(next);
-									setMessage('Motion settings pasted.');
+									setMessage(__('Motion settings pasted.', 'norinmotion'));
 								})
 								.catch(function (error) {
 									setMessage(error.message);
@@ -504,7 +461,7 @@
 					'div',
 					{
 						key: 'actions',
-						className: 'kinetivo-free-actions' + (enabled ? '' : ' kinetivo-free-actions--single')
+						className: 'norinmotion-actions' + (enabled ? '' : ' norinmotion-actions--single')
 					},
 					actions
 				)
@@ -513,7 +470,7 @@
 				summary.push(
 					el(
 						'p',
-						{ key: 'feedback', className: 'kinetivo-free-actions-feedback', role: 'status' },
+						{ key: 'feedback', className: 'norinmotion-actions-feedback', role: 'status' },
 						message
 					)
 				);
@@ -530,24 +487,7 @@
 					summary
 				)
 			];
-			if (enabled && !available)
-				panels.push(
-					el(
-						wp.components.PanelBody,
-						{ key: 'inactive', title: __('Advanced effect', 'norinmotion'), initialOpen: true },
-						el(
-							wp.components.Notice,
-							{ status: 'info', isDismissible: false },
-							window.KinetivoProActive
-								? __('This effect is managed by WP Motion Block Pro.', 'norinmotion')
-								: __(
-										'This saved Pro effect is inactive. Its settings are preserved and the content remains visible.',
-										'norinmotion'
-									)
-						)
-					)
-				);
-			if (enabled && available) {
+			if (enabled) {
 				var movement = /(?:up|down|left|right)/.test(config.effect.preset),
 					scaling = /(?:scale|zoom)/.test(config.effect.preset),
 					rotating = /rotate/.test(config.effect.preset),
@@ -690,11 +630,29 @@
 						el(wp.components.SelectControl, {
 							label: __('Easing', 'norinmotion'),
 							value: config.timing.easing,
-							options: easingOptions(config.timing.easing),
+							options: easingOptions(),
 							onChange: function (value) {
 								set(['timing', 'easing'], value);
 							}
-						})
+						}),
+						el(wp.components.RangeControl, {
+							label: __('Repeat count', 'norinmotion'),
+							help: __('Number of extra plays after the first one.', 'norinmotion'),
+							value: Math.max(0, (config.timing.iterations || 1) - 1),
+							min: 0,
+							max: 20,
+							onChange: function (value) {
+								set(['timing', 'iterations'], 1 + Math.max(0, Math.min(20, value || 0)));
+							}
+						}),
+						config.timing.iterations > 1 &&
+							el(wp.components.ToggleControl, {
+								label: __('Alternate direction on each repeat', 'norinmotion'),
+								checked: config.timing.direction === 'alternate',
+								onChange: function (value) {
+									set(['timing', 'direction'], value ? 'alternate' : 'normal');
+								}
+							})
 					)
 				);
 				panels.push(
@@ -730,6 +688,6 @@
 				el(wp.blockEditor.InspectorControls, { group: 'settings' }, panels)
 			);
 		};
-	}, 'withKinetivoMotion');
-	wp.hooks.addFilter('editor.BlockEdit', 'kinetivo/inspector', withMotion);
+	}, 'withNorinMotion');
+	wp.hooks.addFilter('editor.BlockEdit', 'norinmotion/inspector', withMotion);
 })(window.wp);

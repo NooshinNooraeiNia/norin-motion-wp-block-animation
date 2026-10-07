@@ -2,17 +2,20 @@
 /**
  * Safely annotates the verified root tag without wrappers.
  *
- * @package GutenbergMotion
+ * @package NorinMotion
  */
 
 declare(strict_types=1);
 
-namespace GutenbergMotion\Blocks;
+namespace NorinMotion\Blocks;
 
-use GutenbergMotion\Assets;
-use GutenbergMotion\Capabilities\Registry;
-use GutenbergMotion\Config\Sanitizer;
-use GutenbergMotion\Settings\SettingsPage;
+use NorinMotion\Assets;
+use NorinMotion\Config\Sanitizer;
+use NorinMotion\Settings\SettingsPage;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 final class RenderAnnotator {
 	private int $instance = 0;
@@ -20,8 +23,7 @@ final class RenderAnnotator {
 	public function __construct(
 		private CompatibilityRegistry $registry,
 		private Sanitizer $sanitizer,
-		private Assets $assets,
-		private ?Registry $capabilities = null
+		private Assets $assets
 	) {}
 
 	public function register(): void {
@@ -43,35 +45,16 @@ final class RenderAnnotator {
 			return $html;
 		}
 
-		$raw    = $block['attrs']['gmotion'] ?? null;
+		$raw    = $block['attrs']['norinmotion'] ?? null;
 		$config = $this->sanitizer->normalize( $raw );
 		if ( null === $config || empty( $config['enabled'] ) ) {
 			return $html;
 		}
 
-		$config = apply_filters( 'gmotion_animation_config', $config, $block );
-		$config = apply_filters( 'kinetivo_animation_config', $config, $block );
+		$config = apply_filters( 'norinmotion_animation_config', $config, $block );
 		$config = $this->sanitizer->normalize( $config );
 		if ( null === $config || empty( $config['enabled'] ) ) {
 			return $html;
-		}
-		$this->capabilities ??= new Registry();
-		$preset = (string) $config['effect']['preset'];
-		if ( ! $this->capabilities->is_available( $preset, $config ) ) {
-			return $html;
-		}
-		$adapter = $this->registry->adapter( $name );
-		$targets = is_array( $adapter ) && isset( $adapter['targets'] ) && is_array( $adapter['targets'] ) ? $adapter['targets'] : array( 'root' );
-		if ( ! in_array( $config['effect']['target']['mode'], $targets, true ) ) {
-			$config['effect']['target']['mode'] = 'root';
-			$config['timing']['stagger'] = null;
-		}
-
-		foreach ( $config['animations'] ?? array() as $index => $animation ) {
-			if ( ! in_array( $animation['effect']['target']['mode'], $targets, true ) ) {
-				$config['animations'][ $index ]['effect']['target']['mode'] = 'root';
-				$config['animations'][ $index ]['timing']['stagger'] = null;
-			}
 		}
 
 		$processor = new \WP_HTML_Tag_Processor( $html );
@@ -80,17 +63,13 @@ final class RenderAnnotator {
 		}
 
 		++$this->instance;
-		$key = 'gm-' . $this->instance;
-		do_action( 'gmotion_before_annotate_block', $block, $key );
-		$processor->add_class( 'has-gmotion' );
-		$processor->set_attribute( 'data-gmotion', (string) wp_json_encode( $config ) );
-		$processor->set_attribute( 'data-gmotion-key', $key );
-		$processor->set_attribute( 'data-gmotion-profile', is_array( $adapter ) ? (string) ( $adapter['profile'] ?? 'root' ) : 'root' );
+		$key = 'norinmotion-' . $this->instance;
+		$processor->add_class( 'has-norinmotion' );
+		$processor->set_attribute( 'data-norinmotion', (string) wp_json_encode( $config ) );
+		$processor->set_attribute( 'data-norinmotion-key', $key );
 		$annotated = $processor->get_updated_html();
 		$this->assets->enqueue_runtime();
-		do_action( 'kinetivo_enqueue_effect_assets', $preset, $config, $block );
-		do_action( 'gmotion_after_annotate_block', $annotated, $block, $key );
 
-		return (string) apply_filters( 'gmotion_render_attributes', $annotated, $block, $config );
+		return $annotated;
 	}
 }

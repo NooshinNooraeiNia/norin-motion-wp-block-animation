@@ -1,6 +1,6 @@
 (function () {
 	'use strict';
-	var FREE_EFFECTS = [
+	var EFFECTS = [
 		'fade-in',
 		'fade-up',
 		'fade-down',
@@ -25,11 +25,9 @@
 	var instances = new WeakMap(),
 		roots = new Set(),
 		pausedRoots = new WeakSet(),
-		effectFactories = new Map(),
 		mutationObserver = null,
 		suspended = false;
-	var settings = window.KinetivoSettings ||
-		window.GutenbergMotionSettings || {
+	var settings = window.NorinMotionSettings || {
 			mobileQuery: '(max-width: 767px)',
 			tabletQuery: '(max-width: 1024px)',
 			reducedPolicy: 'inherit',
@@ -50,14 +48,6 @@
 		expressive: 'cubic-bezier(.34,1.56,.64,1)'
 	};
 
-	var capabilities = {
-		tier: 'free',
-		engine: 'native',
-		css: true,
-		webAnimations: true,
-		intersectionObserver: true,
-		effects: FREE_EFFECTS.length
-	};
 	function warn(message, element) {
 		if (settings.debug && window.console)
 			console.warn('[Norin Motion - Block Animation] ' + message, element || '');
@@ -85,7 +75,7 @@
 
 	function resolveConfig(root) {
 		try {
-			var config = JSON.parse(root.getAttribute('data-gmotion') || 'null');
+			var config = JSON.parse(root.getAttribute('data-norinmotion') || 'null');
 			if (
 				!config ||
 				config.v !== 2 ||
@@ -221,7 +211,7 @@
 		function play() {
 			if (typeof root.animate !== 'function') return;
 			if (animation) animation.cancel();
-			root.classList.add('is-kinetivo-animating');
+			root.classList.add('is-norinmotion-animating');
 			animation = root.animate(frames, {
 				duration: simplified ? 200 : Math.max(100, (+timing.duration || 0.7) * 1000),
 				delay: simplified ? 0 : Math.max(0, (+timing.delay || 0) * 1000),
@@ -234,21 +224,17 @@
 			animation.finished
 				.catch(function () {})
 				.then(function () {
-					if (animation === current) root.classList.remove('is-kinetivo-animating');
+					if (animation === current) root.classList.remove('is-norinmotion-animating');
 				});
 		}
 		return {
 			play: play,
 			destroy: function () {
 				if (animation) animation.cancel();
-				root.classList.remove('is-kinetivo-animating');
+				root.classList.remove('is-norinmotion-animating');
 			}
 		};
 	}
-
-	FREE_EFFECTS.forEach(function (preset) {
-		effectFactories.set(preset, nativeFactory);
-	});
 
 	function startMargin(config) {
 		var match = /^(?:top|bottom) (\d{1,3})%$/.exec((config.trigger && config.trigger.start) || ''),
@@ -259,34 +245,28 @@
 			'px 0px'
 		);
 	}
-	function inViewport(root) {
-		if (!root.getBoundingClientRect) return false;
-		var rect = root.getBoundingClientRect(),
-			height = window.innerHeight || document.documentElement.clientHeight;
-		return rect.bottom > 0 && rect.top < height;
-	}
 	function initialize(root) {
 		if (suspended || !(root instanceof Element) || instances.has(root) || pausedRoots.has(root))
 			return;
 		var config = resolveConfig(root);
 		if (!config) return;
 		var policy = reducedPolicy(config),
-			factory = effectFactories.get(config.effect.preset);
+			factory = EFFECTS.indexOf(config.effect.preset) !== -1 ? nativeFactory : null;
 		if (policy === 'disable') {
 			instances.set(root, {
 				destroy: function () {
 					instances.delete(root);
 					roots.delete(root);
-					root.removeAttribute('data-kinetivo-state');
+					root.removeAttribute('data-norinmotion-state');
 				}
 			});
 			roots.add(root);
-			root.setAttribute('data-kinetivo-state', 'reduced');
+			root.setAttribute('data-norinmotion-state', 'reduced');
 			return;
 		}
 		if (!factory) {
-			root.setAttribute('data-kinetivo-state', 'inactive-capability');
-			warn('Required effect provider is unavailable.', root);
+			root.setAttribute('data-norinmotion-state', 'unsupported-effect');
+			warn('Unknown effect ignored.', root);
 			return;
 		}
 		var controller,
@@ -294,9 +274,7 @@
 			disposed = false,
 			trigger = config.trigger || { type: 'load' };
 		try {
-			controller = factory(root, config, policy === 'simplify', {
-				preserveVisibility: inViewport(root)
-			});
+			controller = factory(root, config, policy === 'simplify');
 		} catch (error) {
 			warn('Effect initialization failed; content remains available.', root);
 			return;
@@ -313,7 +291,7 @@
 			} finally {
 				instances.delete(root);
 				roots.delete(root);
-				root.removeAttribute('data-kinetivo-state');
+				root.removeAttribute('data-norinmotion-state');
 			}
 		}
 		function play() {
@@ -330,17 +308,12 @@
 		}
 		instances.set(root, { destroy: destroyInstance });
 		roots.add(root);
-		root.setAttribute('data-kinetivo-state', 'ready');
+		root.setAttribute('data-norinmotion-state', 'ready');
 		// Focus must never land in an invisible entrance animation.
-		if (
-			root.addEventListener &&
-			!controller.handlesFocus &&
-			['hover', 'focus', 'click'].indexOf(trigger.type) === -1
-		)
+		if (root.addEventListener)
 			root.addEventListener('focusin', revealFocusedContent);
 		try {
 			if (
-				!controller.handlesTrigger &&
 				trigger.type === 'viewport' &&
 				'IntersectionObserver' in window
 			) {
@@ -356,7 +329,7 @@
 					{ rootMargin: startMargin(config), threshold: 0 }
 				);
 				observer.observe(root);
-			} else if (!controller.handlesTrigger) play();
+			} else play();
 		} catch (error) {
 			destroyInstance();
 			warn('Effect trigger failed; content restored.', root);
@@ -369,8 +342,8 @@
 			if (!automatic) pausedRoots.delete(element);
 			initialize(element);
 		}
-		if (scope.matches && scope.matches('[data-gmotion]')) visit(scope);
-		scope.querySelectorAll('[data-gmotion]').forEach(visit);
+		if (scope.matches && scope.matches('[data-norinmotion]')) visit(scope);
+		scope.querySelectorAll('[data-norinmotion]').forEach(visit);
 	}
 	function destroy(root, automatic) {
 		Array.from(roots).forEach(function (element) {
@@ -383,18 +356,10 @@
 	}
 	function rebuild() {
 		destroy();
-		document.querySelectorAll('[data-gmotion]').forEach(function (element) {
-			element.removeAttribute('data-kinetivo-state');
+		document.querySelectorAll('[data-norinmotion]').forEach(function (element) {
+			element.removeAttribute('data-norinmotion-state');
 		});
 		refresh();
-	}
-	function registerEffect(preset, factory) {
-		if (typeof preset !== 'string' || typeof factory !== 'function') return function () {};
-		effectFactories.set(preset, factory);
-		return function () {
-			if (effectFactories.get(preset) === factory) effectFactories.delete(preset);
-			rebuild();
-		};
 	}
 	function observe() {
 		if (suspended || mutationObserver || !('MutationObserver' in window)) return;
@@ -427,54 +392,21 @@
 		observe();
 	}
 
-	window.Kinetivo = Object.freeze({
-		version: '1.1.0',
+	window.NorinMotion = Object.freeze({
+		version: '1.1.1',
 		schemaVersion: 2,
-		get engine() {
-			return capabilities.engine;
-		},
-		effects: Object.freeze(FREE_EFFECTS.slice()),
-		getKeyframes: function (config) {
-			var state = curatedState(config);
-			return [
-				frame(state.from, config.effect.preset, true),
-				frame(state.to, config.effect.preset, false)
-			];
-		},
-		resolveMotion: function (config) {
-			var next = merge(
-				config,
-				mobileMedia.matches
-					? config.responsive && config.responsive.mobile
-					: tabletMedia.matches
-						? config.responsive && config.responsive.tablet
-						: null
-			);
-			return next.enabled === false || reducedPolicy(next) === 'disable'
-				? null
-				: { config: next, simplified: reducedPolicy(next) === 'simplify' };
-		},
-		registerEffect: registerEffect,
+		effects: Object.freeze(EFFECTS.slice()),
 		refresh: refresh,
 		destroy: destroy,
-		setCapabilities: function (value) {
-			capabilities = Object.assign({}, capabilities, value);
-		},
-		getCapabilities: function () {
-			return Object.freeze(Object.assign({}, capabilities));
-		},
 		getDiagnostics: function () {
 			return Object.freeze({
 				initialized: roots.size,
-				configured: document.querySelectorAll('[data-gmotion]').length,
+				configured: document.querySelectorAll('[data-norinmotion]').length,
 				reducedMotion: reducedMedia.matches,
 				mobile: mobileMedia.matches,
 				tablet: !mobileMedia.matches && tabletMedia.matches
 			});
 		}
-	});
-	(window.KinetivoProviderQueue || []).splice(0).forEach(function (provider) {
-		if (typeof provider === 'function') provider(window.Kinetivo);
 	});
 	[mobileMedia, tabletMedia, reducedMedia].forEach(function (media) {
 		if (media.addEventListener) media.addEventListener('change', rebuild);

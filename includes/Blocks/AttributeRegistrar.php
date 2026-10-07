@@ -2,12 +2,16 @@
 /**
  * Registers the portable block attribute on both static and dynamic blocks.
  *
- * @package GutenbergMotion
+ * @package NorinMotion
  */
 
 declare(strict_types=1);
 
-namespace GutenbergMotion\Blocks;
+namespace NorinMotion\Blocks;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 final class AttributeRegistrar {
 	public function __construct( private CompatibilityRegistry $registry ) {}
@@ -26,7 +30,7 @@ final class AttributeRegistrar {
 		}
 
 		$args['attributes']              = isset( $args['attributes'] ) && is_array( $args['attributes'] ) ? $args['attributes'] : array();
-		$args['attributes']['gmotion'] = array( 'type' => 'object' );
+		$args['attributes']['norinmotion'] = array( 'type' => 'object' );
 		return $args;
 	}
 }
